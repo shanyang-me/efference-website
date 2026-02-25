@@ -369,7 +369,7 @@
   const EXAMPLE_DESCRIPTION = 'A glass cup sits on the edge of a wooden table, about 55% overhanging. The glass is partially filled with water. The table is 75 cm tall. A concrete floor is below.';
   const exampleBtn = document.getElementById('demo-example');
 
-  exampleBtn.addEventListener('click', () => {
+  function loadExample() {
     // Switch to image mode and load example
     tabs.forEach(t => t.classList.remove('active'));
     tabs.forEach(t => { if (t.dataset.mode === 'image') t.classList.add('active'); });
@@ -382,13 +382,18 @@
     previewWrap.style.display = '';
     dropzone.style.display = 'none';
 
-    // Also fill the text input for reference
+    // Fill the text input for reference
     demoInput.value = EXAMPLE_DESCRIPTION;
 
     // Render with fallback data immediately (no server needed)
     renderResult(FALLBACK, false);
     renderVisual(FALLBACK);
-  });
+  }
+
+  exampleBtn.addEventListener('click', loadExample);
+
+  // Auto-load example on page load
+  loadExample();
 
   demoBtn.addEventListener('click', async () => {
     if (currentMode === 'text') {
