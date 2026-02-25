@@ -1,6 +1,6 @@
 // Efference — main.js
 
-// ===== Neural network background — neurons that fire =====
+// ===== Brain-shaped neural network with physics symbols =====
 (function () {
   const canvas = document.getElementById('bg-canvas');
   if (!canvas) return;
@@ -10,70 +10,139 @@
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
-    if (neurons.length) buildNetwork();
+    buildNetwork();
   }
   window.addEventListener('resize', resize);
   resize();
 
   // --- Config ---
-  const NUM_NEURONS = 70;
-  const AXON_DIST = 200;         // max distance for axon connection
-  const FIRE_INTERVAL = 1200;    // ms between random firings
-  const SIGNAL_SPEED = 3;        // px per frame for action potential
-  const RESTING = 'rgba(211,255,202,0.12)';
-  const RESTING_BORDER = 'rgba(211,255,202,0.2)';
-  const AXON_COLOR = 'rgba(211,255,202,0.04)';
+  const BRAIN_NEURONS = 90;
+  const SCATTER_NEURONS = 30;
+  const AXON_DIST = 180;
+  const FIRE_INTERVAL = 900;
+  const SIGNAL_SPEED = 2.5;
 
-  // --- State ---
+  // Physics symbols that float around
+  const SYMBOLS = [
+    'F=ma', 'g', '\u2193', '\u2192', '\u03C3', '\u0394p', 'N', '\u03C4',
+    'E=\u00BDmv\u00B2', '\u2211F=0', 'mg', '\u03B1', '\u03C9', 'J',
+    '\u222B', 'dx/dt', '\u2207', 'p=mv'
+  ];
+
   let neurons = [];
-  let axons = [];       // { from, to, dist }
-  let signals = [];     // { from, to, progress (0-1), dx, dy, dist }
+  let axons = [];
+  let signals = [];
+  let symbols = [];
+
+  // Brain silhouette: point-in-brain test using an ellipse + bumps
+  function brainShape(x, y, cx, cy, rw, rh) {
+    // Normalize to unit circle
+    const nx = (x - cx) / rw;
+    const ny = (y - cy) / rh;
+    // Brain shape: two hemispheres with a slight dip in the middle (corpus callosum)
+    const r = Math.sqrt(nx * nx + ny * ny);
+    // Add lobes: frontal (front bulge), occipital (back), temporal (sides)
+    const angle = Math.atan2(ny, nx);
+    const lobe = 1.0
+      + 0.12 * Math.cos(angle * 2)        // two-hemisphere shape
+      + 0.08 * Math.cos(angle + 0.3)      // frontal lobe
+      - 0.06 * Math.cos(angle * 3)        // temporal lobes
+      + 0.05 * Math.sin(angle * 4);       // gyri bumps
+    return r < lobe;
+  }
 
   function buildNetwork() {
     neurons = [];
     axons = [];
     signals = [];
+    symbols = [];
 
-    // Place neurons with some clustering (brain-like)
-    for (let i = 0; i < NUM_NEURONS; i++) {
-      // Cluster centers
-      const cx = Math.random() * W;
-      const cy = Math.random() * H;
+    // Brain center and size (upper portion of viewport)
+    const bcx = W * 0.5;
+    const bcy = H * 0.38;
+    const brw = Math.min(W * 0.38, 500);
+    const brh = Math.min(H * 0.32, 380);
+
+    // Place neurons inside brain shape
+    let placed = 0;
+    let attempts = 0;
+    while (placed < BRAIN_NEURONS && attempts < 5000) {
+      attempts++;
+      const x = bcx + (Math.random() - 0.5) * brw * 2.2;
+      const y = bcy + (Math.random() - 0.5) * brh * 2.2;
+      if (brainShape(x, y, bcx, bcy, brw, brh)) {
+        // Vary size — larger near center
+        const distFromCenter = Math.sqrt((x - bcx) ** 2 + (y - bcy) ** 2);
+        const maxDist = Math.sqrt(brw ** 2 + brh ** 2);
+        const centralness = 1 - distFromCenter / maxDist;
+        neurons.push({
+          x, y,
+          r: 1.8 + centralness * 2.5 + Math.random() * 1.2,
+          firing: 0,
+          refractory: 0,
+          vx: (Math.random() - 0.5) * 0.08,
+          vy: (Math.random() - 0.5) * 0.08,
+          inBrain: true,
+          // Dendrite branches
+          dendrites: Math.floor(Math.random() * 4),
+          dendriteAngle: Math.random() * Math.PI * 2,
+        });
+        placed++;
+      }
+    }
+
+    // Scatter some neurons outside brain (spinal/peripheral)
+    for (let i = 0; i < SCATTER_NEURONS; i++) {
       neurons.push({
-        x: cx + (Math.random() - 0.5) * 80,
-        y: cy + (Math.random() - 0.5) * 80,
-        r: 2 + Math.random() * 2.5,
-        // Firing state
-        firing: 0,       // 0 = resting, >0 = firing (decays)
-        refractory: 0,   // cooldown after firing
-        // Gentle drift
-        vx: (Math.random() - 0.5) * 0.15,
-        vy: (Math.random() - 0.5) * 0.15,
+        x: Math.random() * W,
+        y: bcy + brh * 0.8 + Math.random() * (H - bcy - brh * 0.8 + 100),
+        r: 1.2 + Math.random() * 1.5,
+        firing: 0,
+        refractory: 0,
+        vx: (Math.random() - 0.5) * 0.12,
+        vy: (Math.random() - 0.5) * 0.12,
+        inBrain: false,
+        dendrites: Math.floor(Math.random() * 2),
+        dendriteAngle: Math.random() * Math.PI * 2,
       });
     }
 
-    // Build axon connections (nearest neighbors)
+    // Build axon connections
     for (let i = 0; i < neurons.length; i++) {
       for (let j = i + 1; j < neurons.length; j++) {
         const dx = neurons[i].x - neurons[j].x;
         const dy = neurons[i].y - neurons[j].y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < AXON_DIST) {
+        const maxDist = (neurons[i].inBrain && neurons[j].inBrain) ? AXON_DIST : AXON_DIST * 0.7;
+        if (dist < maxDist) {
           axons.push({ from: i, to: j, dist });
         }
       }
     }
+
+    // Place floating physics symbols
+    for (let i = 0; i < 20; i++) {
+      symbols.push({
+        text: SYMBOLS[i % SYMBOLS.length],
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.15,
+        alpha: 0.04 + Math.random() * 0.06,
+        size: 10 + Math.random() * 6,
+        rotation: (Math.random() - 0.5) * 0.3,
+        rotSpeed: (Math.random() - 0.5) * 0.001,
+      });
+    }
   }
-  buildNetwork();
 
   // --- Fire a neuron ---
   function fireNeuron(idx) {
     const n = neurons[idx];
     if (n.refractory > 0) return;
     n.firing = 1.0;
-    n.refractory = 80; // frames of cooldown
+    n.refractory = 70;
 
-    // Send signals along all connected axons
     for (const ax of axons) {
       let target = -1;
       if (ax.from === idx) target = ax.to;
@@ -85,9 +154,8 @@
       const dy = tn.y - n.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       signals.push({
-        fromIdx: idx,
-        toIdx: target,
-        sx: n.x, sy: n.y,     // start
+        fromIdx: idx, toIdx: target,
+        sx: n.x, sy: n.y,
         dx, dy, dist,
         progress: 0,
         speed: SIGNAL_SPEED / dist,
@@ -95,115 +163,181 @@
     }
   }
 
-  // Random spontaneous firing
   let lastFire = 0;
   function maybeFireRandom(time) {
     if (time - lastFire > FIRE_INTERVAL) {
       lastFire = time;
-      // Fire 1-3 random neurons
-      const count = 1 + Math.floor(Math.random() * 3);
+      const count = 1 + Math.floor(Math.random() * 4);
       for (let c = 0; c < count; c++) {
-        const idx = Math.floor(Math.random() * neurons.length);
-        fireNeuron(idx);
+        fireNeuron(Math.floor(Math.random() * neurons.length));
       }
     }
   }
 
   function update() {
-    // Drift neurons slowly
     for (const n of neurons) {
       n.x += n.vx;
       n.y += n.vy;
-      // Soft boundary
-      if (n.x < -30) n.vx = Math.abs(n.vx);
-      if (n.x > W + 30) n.vx = -Math.abs(n.vx);
-      if (n.y < -30) n.vy = Math.abs(n.vy);
-      if (n.y > H + 30) n.vy = -Math.abs(n.vy);
-
-      // Decay firing
-      if (n.firing > 0) n.firing *= 0.95;
+      if (n.x < -40) n.vx = Math.abs(n.vx);
+      if (n.x > W + 40) n.vx = -Math.abs(n.vx);
+      if (n.y < -40) n.vy = Math.abs(n.vy);
+      if (n.y > H + 40) n.vy = -Math.abs(n.vy);
+      if (n.firing > 0) n.firing *= 0.94;
       if (n.firing < 0.01) n.firing = 0;
       if (n.refractory > 0) n.refractory--;
     }
 
-    // Move signals
     for (let i = signals.length - 1; i >= 0; i--) {
       const s = signals[i];
       s.progress += s.speed;
       if (s.progress >= 1) {
-        // Signal arrived — fire target neuron (chain reaction)
-        if (Math.random() < 0.55) { // 55% propagation chance
-          fireNeuron(s.toIdx);
-        }
+        if (Math.random() < 0.5) fireNeuron(s.toIdx);
         signals.splice(i, 1);
       }
+    }
+
+    // Drift symbols
+    for (const s of symbols) {
+      s.x += s.vx;
+      s.y += s.vy;
+      s.rotation += s.rotSpeed;
+      if (s.x < -40) s.x = W + 40;
+      if (s.x > W + 40) s.x = -40;
+      if (s.y < -40) s.y = H + 40;
+      if (s.y > H + 40) s.y = -40;
     }
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
-    // Draw axons (dendrites)
+    // Brain outline glow (very subtle)
+    const bcx = W * 0.5;
+    const bcy = H * 0.38;
+    const brw = Math.min(W * 0.38, 500);
+    const brh = Math.min(H * 0.32, 380);
+    const grad = ctx.createRadialGradient(bcx, bcy, 0, bcx, bcy, Math.max(brw, brh));
+    grad.addColorStop(0, 'rgba(211,255,202,0.02)');
+    grad.addColorStop(0.7, 'rgba(211,255,202,0.01)');
+    grad.addColorStop(1, 'rgba(211,255,202,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Axons (with subtle curves for dendrite feel)
     for (const ax of axons) {
       const a = neurons[ax.from];
       const b = neurons[ax.to];
       const bright = Math.max(a.firing, b.firing);
-      const alpha = 0.03 + bright * 0.12;
+      const alpha = 0.025 + bright * 0.15;
       ctx.beginPath();
+      // Slight curve via midpoint offset
+      const mx = (a.x + b.x) / 2 + (a.y - b.y) * 0.1;
+      const my = (a.y + b.y) / 2 + (b.x - a.x) * 0.1;
       ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
+      ctx.quadraticCurveTo(mx, my, b.x, b.y);
       ctx.strokeStyle = `rgba(211,255,202,${alpha})`;
-      ctx.lineWidth = 0.5 + bright * 1;
+      ctx.lineWidth = 0.4 + bright * 1.2;
       ctx.stroke();
     }
 
-    // Draw action potential signals (bright dots traveling along axons)
+    // Dendrite branches on neurons
+    for (const n of neurons) {
+      if (n.dendrites === 0) continue;
+      const f = n.firing;
+      const alpha = 0.04 + f * 0.1;
+      ctx.strokeStyle = `rgba(211,255,202,${alpha})`;
+      ctx.lineWidth = 0.5;
+      for (let d = 0; d < n.dendrites; d++) {
+        const angle = n.dendriteAngle + (d * Math.PI * 2 / n.dendrites);
+        const len = n.r * 4 + Math.random() * 3;
+        const ex = n.x + Math.cos(angle) * len;
+        const ey = n.y + Math.sin(angle) * len;
+        // Branching fork
+        const mid = 0.6;
+        const mx = n.x + Math.cos(angle) * len * mid;
+        const my = n.y + Math.sin(angle) * len * mid;
+        ctx.beginPath();
+        ctx.moveTo(n.x, n.y);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        // Fork
+        const forkAngle = 0.5;
+        const forkLen = len * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx + Math.cos(angle + forkAngle) * forkLen, my + Math.sin(angle + forkAngle) * forkLen);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx + Math.cos(angle - forkAngle) * forkLen, my + Math.sin(angle - forkAngle) * forkLen);
+        ctx.stroke();
+      }
+    }
+
+    // Action potential signals
     for (const s of signals) {
       const px = s.sx + s.dx * s.progress;
       const py = s.sy + s.dy * s.progress;
-      const glow = 1 - Math.abs(s.progress - 0.5) * 2; // brightest at midpoint
+      const glow = 1 - Math.abs(s.progress - 0.5) * 2;
 
-      // Glow
       ctx.beginPath();
-      ctx.arc(px, py, 6 + glow * 4, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(211,255,202,${0.08 + glow * 0.12})`;
+      ctx.arc(px, py, 5 + glow * 5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(211,255,202,${0.06 + glow * 0.15})`;
       ctx.fill();
 
-      // Core
       ctx.beginPath();
-      ctx.arc(px, py, 2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(211,255,202,${0.5 + glow * 0.5})`;
+      ctx.arc(px, py, 1.5 + glow, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(211,255,202,${0.4 + glow * 0.6})`;
       ctx.fill();
     }
 
-    // Draw neurons (soma)
+    // Neurons (soma)
     for (const n of neurons) {
       const f = n.firing;
 
       // Firing glow
       if (f > 0.05) {
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r + 8 + f * 12, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(211,255,202,${f * 0.15})`;
+        ctx.arc(n.x, n.y, n.r + 10 + f * 16, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(211,255,202,${f * 0.12})`;
+        ctx.fill();
+
+        // Secondary glow ring
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r + 4 + f * 8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(211,255,202,${f * 0.2})`;
         ctx.fill();
       }
 
-      // Soma body
+      // Soma
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      if (f > 0.05) {
-        ctx.fillStyle = `rgba(211,255,202,${0.2 + f * 0.8})`;
-      } else {
-        ctx.fillStyle = RESTING;
-      }
+      ctx.fillStyle = f > 0.05
+        ? `rgba(211,255,202,${0.15 + f * 0.85})`
+        : `rgba(211,255,202,${n.inBrain ? 0.1 : 0.06})`;
       ctx.fill();
 
-      // Border
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.strokeStyle = f > 0.05 ? `rgba(211,255,202,${0.3 + f * 0.7})` : RESTING_BORDER;
-      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = f > 0.05
+        ? `rgba(211,255,202,${0.3 + f * 0.7})`
+        : `rgba(211,255,202,${n.inBrain ? 0.15 : 0.08})`;
+      ctx.lineWidth = 0.6;
       ctx.stroke();
+    }
+
+    // Physics symbols (floating, translucent)
+    ctx.font = '500 13px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const s of symbols) {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.rotation);
+      ctx.fillStyle = `rgba(211,255,202,${s.alpha})`;
+      ctx.font = `500 ${s.size}px "JetBrains Mono", monospace`;
+      ctx.fillText(s.text, 0, 0);
+      ctx.restore();
     }
   }
 
