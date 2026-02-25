@@ -1,5 +1,160 @@
 // Efference — main.js
 
+// ===== Physics particle background =====
+(function () {
+  const canvas = document.getElementById('bg-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const ACCENT = '#d3ffca';
+  const DIM = 'rgba(211,255,202,';
+  const GRAVITY = 0.02;
+  const BOUNCE = 0.6;
+  const CONNECTION_DIST = 160;
+  const NUM_PARTICLES = 50;
+  const TRAIL_LEN = 8;
+  let W, H, particles = [], animId;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Particle: position, velocity, radius, has gravity?, trail
+  function spawn() {
+    const hasGravity = Math.random() < 0.35;
+    const r = 1.5 + Math.random() * 2.5;
+    return {
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: hasGravity ? Math.random() * -1.5 : (Math.random() - 0.5) * 0.6,
+      r,
+      grav: hasGravity,
+      trail: [],
+      alpha: 0.15 + Math.random() * 0.25
+    };
+  }
+
+  for (let i = 0; i < NUM_PARTICLES; i++) particles.push(spawn());
+
+  function update() {
+    for (const p of particles) {
+      // Store trail
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > TRAIL_LEN) p.trail.shift();
+
+      // Apply gravity to some particles
+      if (p.grav) p.vy += GRAVITY;
+
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // Bounce off floor
+      if (p.grav && p.y > H - 20) {
+        p.y = H - 20;
+        p.vy *= -BOUNCE;
+        if (Math.abs(p.vy) < 0.1) {
+          // Reset — launch upward again
+          p.vy = -1 - Math.random() * 1.5;
+          p.vx = (Math.random() - 0.5) * 1.2;
+        }
+      }
+
+      // Wrap horizontally
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+      // Wrap vertically for non-gravity particles
+      if (!p.grav) {
+        if (p.y < -10) p.y = H + 10;
+        if (p.y > H + 10) p.y = -10;
+      }
+      // Reset gravity particles that escape top
+      if (p.grav && p.y < -50) {
+        p.y = H - 20;
+        p.vy = -1 - Math.random() * 1.5;
+      }
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Connections (neural-network style)
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONNECTION_DIST) {
+          const alpha = (1 - dist / CONNECTION_DIST) * 0.08;
+          ctx.strokeStyle = DIM + alpha + ')';
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Particles + trails
+    for (const p of particles) {
+      // Trail (trajectory)
+      if (p.trail.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(p.trail[0].x, p.trail[0].y);
+        for (let t = 1; t < p.trail.length; t++) {
+          ctx.lineTo(p.trail[t].x, p.trail[t].y);
+        }
+        ctx.strokeStyle = DIM + (p.alpha * 0.3) + ')';
+        ctx.lineWidth = p.r * 0.8;
+        ctx.stroke();
+      }
+
+      // Dot
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = DIM + p.alpha + ')';
+      ctx.fill();
+
+      // Gravity arrow for gravity particles
+      if (p.grav && p.vy > 0.2) {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + p.r + 2);
+        ctx.lineTo(p.x, p.y + p.r + 10);
+        ctx.strokeStyle = DIM + (p.alpha * 0.5) + ')';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Arrowhead
+        ctx.beginPath();
+        ctx.moveTo(p.x - 3, p.y + p.r + 7);
+        ctx.lineTo(p.x, p.y + p.r + 12);
+        ctx.lineTo(p.x + 3, p.y + p.r + 7);
+        ctx.fillStyle = DIM + (p.alpha * 0.5) + ')';
+        ctx.fill();
+      }
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  // Reduce motion preference
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!prefersReduced) {
+    loop();
+  } else {
+    // Draw one static frame
+    draw();
+  }
+})();
+
+// ===== Main site logic =====
 (function () {
   'use strict';
 
