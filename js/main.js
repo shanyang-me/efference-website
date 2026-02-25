@@ -522,8 +522,7 @@
 
   exampleBtn.addEventListener('click', loadExample);
 
-  // Auto-load example on page load
-  loadExample();
+  // Example loads only when button is clicked
 
   demoBtn.addEventListener('click', async () => {
     if (currentMode === 'text') {
