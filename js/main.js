@@ -604,9 +604,20 @@
     }
   };
 
+  const sceneDescEl = document.getElementById('demo-scene-desc');
+  const exampleCards = document.querySelectorAll('.demo-example-card');
+
   function loadExample(key) {
     const example = EXAMPLES[key];
     if (!example) return;
+
+    // Mark active card
+    exampleCards.forEach(c => c.classList.remove('active'));
+    document.querySelector(`.demo-example-card[data-example="${key}"]`)?.classList.add('active');
+
+    // Show scene description below the scroll panel
+    sceneDescEl.textContent = example.description;
+    sceneDescEl.classList.add('visible');
 
     // Switch to image mode
     tabs.forEach(t => t.classList.remove('active'));
@@ -628,7 +639,7 @@
     renderVisual(example.fallback);
   }
 
-  document.querySelectorAll('.demo-example-card').forEach(card => {
+  exampleCards.forEach(card => {
     card.addEventListener('click', () => loadExample(card.dataset.example));
   });
 

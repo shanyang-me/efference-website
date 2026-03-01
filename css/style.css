@@ -626,7 +626,7 @@ img { max-width: 100%; display: block; }
   font-family: var(--font-body);
 }
 
-/* Demo examples row */
+/* Demo examples — scrollable panel */
 .demo-examples {
   margin-bottom: 24px;
 }
@@ -638,28 +638,50 @@ img { max-width: 100%; display: block; }
 .demo-examples-label strong {
   color: var(--text-secondary);
 }
-.demo-examples-row {
+.demo-examples-scroll {
   display: flex;
-  gap: 12px;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(211,255,202,0.2) transparent;
+}
+.demo-examples-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+.demo-examples-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.demo-examples-scroll::-webkit-scrollbar-thumb {
+  background: rgba(211,255,202,0.2);
+  border-radius: 3px;
 }
 .demo-example-card {
-  flex: 1;
+  flex: 0 0 180px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 10px;
   padding: 0;
   cursor: pointer;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   color: var(--text-secondary);
   font-family: var(--font-body);
   font-size: 0.8rem;
+  scroll-snap-align: start;
 }
 .demo-example-card:hover {
   border-color: var(--accent);
   box-shadow: 0 0 16px var(--accent-dim);
+  transform: translateY(-2px);
+}
+.demo-example-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-dim);
 }
 .demo-example-card img {
   width: 100%;
@@ -684,9 +706,23 @@ img { max-width: 100%; display: block; }
   background: rgba(26, 26, 26, 0.5);
   color: var(--text-muted);
 }
+.demo-scene-description {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: rgba(211,255,202,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  display: none;
+}
+.demo-scene-description.visible {
+  display: block;
+}
 @media (max-width: 640px) {
-  .demo-examples-row { flex-wrap: wrap; }
-  .demo-example-card { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  .demo-example-card { flex: 0 0 150px; }
 }
 
 /* Demo result styling */
