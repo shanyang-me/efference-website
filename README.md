@@ -1,6 +1,6 @@
-# Efference Website
+# Invariant Lab Website
 
-Product website for [Efference](https://github.com/shanyang/efference) — the physics brain for vision.
+Product website for [Invariant Lab](https://github.com/shanyang-me/efference) — physics world models that understand invariant laws.
 
 ## Local Development
 

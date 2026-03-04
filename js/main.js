@@ -1,4 +1,4 @@
-// Efference — main.js
+// Invariant Lab — main.js
 
 // ===== Brain-shaped neural network with physics symbols =====
 (function () {
@@ -436,7 +436,7 @@
   // --- Demo: Analyze ---
   const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8080'
-    : 'https://alexyangshan--efference-api.modal.run';
+    : 'https://alexyangshan--invariant-lab-api.modal.run';
   const demoBtn = document.getElementById('demo-btn');
   const demoInput = document.getElementById('demo-input');
   const demoOutput = document.getElementById('demo-output');
