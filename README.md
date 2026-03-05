@@ -1,11 +1,11 @@
-# Invariant Lab Website
+# Isometry Lab Website
 
-Product website for [Invariant Lab](https://github.com/shanyang-me/invariant) — physics world models that understand invariant laws.
+Product website for [Isometry Lab](https://github.com/shanyang-me/isometry) — physics world models that understand isometry laws.
 
 ## Local Development
 
 ```bash
-cd ~/invariant-website
+cd ~/isometry-website
 python -m http.server 8000
 # Open http://localhost:8000
 ```
